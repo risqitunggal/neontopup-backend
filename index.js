@@ -21,6 +21,7 @@ app.post('/api/bayar', (req, res) => {
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`Server jalan di port ${PORT}`);
+// Tambahkan '0.0.0.0' agar bisa diakses secara publik di Railway
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server NeonTopUp jalan di port ${PORT}`);
 });
