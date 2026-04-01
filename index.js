@@ -1,43 +1,66 @@
 const express = require('express');
 const cors = require('cors');
+const midtransClient = require('midtrans-client');
 const app = express();
-
-// Konfigurasi PORT untuk Railway
 const PORT = process.env.PORT || 3000;
 
-// 1. PENGATURAN CORS (HARUS DI ATAS)
+// Izinkan akses dari mana saja agar testing lancar
 app.use(cors({
-    origin: '*', // Mengizinkan akses dari mana saja
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+    origin: '*', 
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// 2. MIDDLEWARE JSON
-app.use(express.json());
-
-// Jalur tes (untuk cek di browser)
+// Tambahkan rute GET untuk pengetesan manual di browser
 app.get('/', (req, res) => {
     res.send('Server NeonTopUp Aktif dan Siap Menerima Pesanan!');
 });
 
-// Jalur Pembayaran
-app.post('/api/bayar', (req, res) => {
-    const data = req.body;
-    
-    // Log ini akan muncul di dashboard LOGS Railway Anda
-    console.log("Pesanan masuk:", data);
-
-    if (!data.userId) {
-        return res.status(400).json({ status: "error", message: "User ID kosong" });
-    }
-
-    res.json({
-        status: "success",
-        message: "Server Railway menerima pesanan untuk ID: " + data.userId
-    });
+// Inisialisasi Midtrans Snap
+let snap = new midtransClient.Snap({
+    isProduction: false, // Karena masih Sandbox
+    serverKey: process.env.MIDTRANS_SERVER_KEY,
+    clientKey: process.env.MIDTRANS_CLIENT_KEY
 });
 
-// 3. LISTEN DENGAN HOST 0.0.0.0 (PENTING UNTUK RAILWAY)
+app.post('/api/bayar', async (req, res) => {
+    try {
+        const { userId, serverId, paket, harga } = req.body;
+
+        // Bersihkan harga dari huruf (misal "Rp 50.000" jadi 50000)
+        const numericPrice = parseInt(harga.replace(/\D/g, ""));
+
+        let parameter = {
+            "transaction_details": {
+                "order_id": "NEON-" + Date.now(),
+                "gross_amount": numericPrice
+            },
+            "credit_card": { "secure": true },
+            "customer_details": {
+                "first_name": "ID: " + userId,
+                "last_name": "(" + serverId + ")",
+                "email": "customer@neontopup.com" // Email formal
+            },
+            "item_details": [{
+                "id": "ITEM1",
+                "price": numericPrice,
+                "quantity": 1,
+                "name": paket
+            }]
+        };
+
+        const transaction = await snap.createTransaction(parameter);
+        
+        res.json({
+            status: "success",
+            token: transaction.token
+        });
+    } catch (error) {
+        console.error("Midtrans Error:", error);
+        res.status(500).json({ status: "error", message: error.message });
+    }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server jalan di port ${PORT}`);
+    console.log(`Server NeonTopUp aktif di port ${PORT}`);
 });
