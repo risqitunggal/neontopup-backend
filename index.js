@@ -4,6 +4,11 @@ const midtransClient = require('midtrans-client');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// --- TAMBAHKAN DUA BARIS INI (PENERJEMAH DATA) ---
+app.use(express.json()); 
+app.use(express.urlencoded({ extended: true })); 
+// ------------------------------------------------
+
 // Izinkan akses dari mana saja agar testing lancar
 app.use(cors({
     origin: '*', 
@@ -25,7 +30,12 @@ let snap = new midtransClient.Snap({
 
 app.post('/api/bayar', async (req, res) => {
     try {
+        // Sekarang req.body tidak akan undefined lagi
         const { userId, serverId, paket, harga } = req.body;
+
+        if (!userId || !harga) {
+            return res.status(400).json({ status: "error", message: "Data tidak lengkap" });
+        }
 
         // Bersihkan harga dari huruf (misal "Rp 50.000" jadi 50000)
         const numericPrice = parseInt(harga.replace(/\D/g, ""));
@@ -39,7 +49,7 @@ app.post('/api/bayar', async (req, res) => {
             "customer_details": {
                 "first_name": "ID: " + userId,
                 "last_name": "(" + serverId + ")",
-                "email": "customer@neontopup.com" // Email formal
+                "email": "customer@neontopup.com"
             },
             "item_details": [{
                 "id": "ITEM1",
